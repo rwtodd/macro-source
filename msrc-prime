@@ -6,25 +6,18 @@ no warnings 'experimental::signatures';
 use feature 'refaliasing';
 no warnings 'experimental::refaliasing';
 
-my $prefix = '@.';     # user sets this on first line of file
-my $def_start = undef; # regex for definition start
-my $def_end = undef;   # regex for definition end
-my $def_use = undef;   # regex for fragment use
-
-my %code_fragments;    # the collected code fragments
-my $cur_frag_name;     # the fragment we are collecting
-my @line_stack;        # the non-code lines to process
-
-my @result;      # the array into which code_fragments push results
-
 # ######################################################################
+# MSRC-PRIME -- just enough of an implementation to run against 
+# macsrc.msrc and bootstrap.  The full macsrc is written such that it
+# only uses facilities provided by msrc-prime.
+#
 # LIMITATIONS of msrc-prime:
 # - Only one fragment call per line.
 # - No checks for recursion going out of control
 # - No indentention information available
 # - No global varaible hash for code to share data.
 # - No arguments at definition use
-# ... these will all be address in the full msrc
+# ... these will all be address in the full macsrc
 #
 # ######################################################################
 # Assume prefix @.  First line of the file can set PREFIX: ??
@@ -50,6 +43,17 @@ my @result;      # the array into which code_fragments push results
 #   @.(this one has args(2, 3))
 # }
 # ######################################################################
+
+my $prefix = '@.';     # user sets this on first line of file
+my $def_start = undef; # regex for definition start
+my $def_end = undef;   # regex for definition end
+my $def_use = undef;   # regex for fragment use
+
+my %code_fragments;    # the collected code fragments
+my $cur_frag_name;     # the fragment we are collecting
+my @line_stack;        # the non-code lines to process
+
+my @result;      # the array into which code_fragments push results
 
 sub read_until($rx) {
    my @lines = ();
