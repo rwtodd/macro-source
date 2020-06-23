@@ -1,0 +1,136 @@
+#!/usr/bin/perl
+
+use v5.030;
+use feature 'signatures';
+no warnings 'experimental::signatures';
+use feature 'refaliasing';
+no warnings 'experimental::refaliasing';
+
+my $prefix = '@.';     # user sets this on first line of file
+my $def_start = undef; # regex for definition start
+my $def_end = undef;   # regex for definition end
+my $def_use = undef;   # regex for fragment use
+
+my %code_fragments;    # the collected code fragments
+my $cur_frag_name;     # the fragment we are collecting
+my @line_stack;        # the non-code lines to process
+
+my @result;      # the array into which code_fragments push results
+
+# ######################################################################
+# LIMITATIONS of msrc-prime:
+# - Only one fragment call per line.
+# - No checks for recursion going out of control
+# - No indentention information available
+# - No global varaible hash for code to share data.
+# - No arguments at definition use
+# ... these will all be address in the full msrc
+#
+# ######################################################################
+# Assume prefix @.  First line of the file can set PREFIX: ??
+#
+# Verbatim chunk definition:
+# @./name goes here/
+# verbatim text
+# @.
+#
+# Perl subroutine chunk definition:
+# @./name goes here/p
+# push @result, 'hi there!';
+# @.
+#
+# Raw perl code:
+# @.//p
+# my $counter = 1;  # anything goes!
+# @.
+#
+# Now, inside the code, you can call on chunks like:
+# void do_it(int a) {
+#   @.(name goes here)
+#   @.(this one has args(2, 3))
+# }
+# ######################################################################
+
+sub read_until($rx) {
+   my @lines = ();
+   while(<>) {
+     chomp;
+     last if(/$rx/);
+	 push @lines, $_;
+   }
+   \@lines
+}
+
+sub search_state; #fwd reference
+
+# define the parsing states we can be in
+sub parse_line_state($l) {
+	if($l =~ $def_start) {
+		my ($name, $opt) = ($1, $2);
+		die "empty fragment name!" if(not ($name || $opt));
+		\my @body = read_until($def_end);
+		if(not $opt) {
+			push $code_fragments{$name}->@*, \@body;
+		} else {
+		    if($name) {
+				my $compiled = eval ('sub { ' . (join "\n", @body) . ' }');
+				push $code_fragments{$name}->@*, $compiled; 
+			} else {
+				# it's an anonymous code block to execute now!
+				eval (join "\n", @body);
+			}
+		}
+		\&search_state;
+	} else {
+		push @line_stack, $l;
+		\&parse_line_state;
+	}
+}
+
+sub search_state($l) {
+	if($l =~ m/^\s*$/) {
+		\&search_state; 
+	} else {
+		parse_line_state($l);
+	}
+}
+
+# step one... read the entire input
+#
+# the first line might be a prefix...
+my $line = <>;
+if($line =~ /^ \s* PREFIX: \s* (.*) \s* $/x) {
+	$prefix = $1;
+	$line = '';
+}
+$def_start = qr{ ^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
+$def_end = qr{^ \s* $prefix \s* $}x;
+$def_use = qr{^ \s* $prefix \( \s* (.*?) \s* \) \s* $}x;
+
+my $st = search_state($line);
+while(<>) {
+  chomp;
+  $st = &$st($_);
+}
+
+# step two... run through the line stack, making replacements.
+
+while(scalar @line_stack) {
+  my $cur_line = shift @line_stack;
+  if ($cur_line =~ /$def_use/) {
+	@result = ();
+	foreach my $frag ($code_fragments{$1}->@*) {
+		if(ref($frag) eq 'CODE') {
+			&$frag();
+		} else {
+			push @result, $frag->@*;
+		}
+	}
+	unshift @line_stack, @result;	
+  } else {
+    # if there's no replacement to be made, output it
+	say $cur_line;
+  }
+}
+
+# vim:ft=perl:
