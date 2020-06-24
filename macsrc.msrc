@@ -15,6 +15,7 @@ my %code_fragments;    # the collected code fragments
 my $cur_frag_name;     # the fragment we are collecting
 my @line_stack;        # the non-code lines to process
 
+my %globals;           # a place where code_fragments can store values
 my @result;            # the array into which code_fragments push results
 my $indentation = '';  # a string with the indentation preceding a used fragment 
 
