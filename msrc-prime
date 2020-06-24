@@ -13,12 +13,14 @@ no warnings 'experimental::refaliasing';
 #
 # LIMITATIONS of msrc-prime:
 # - Only one fragment call per line.
+# - No code fragments, only replacement texts
 # - No error checking
 # - No way to change the PREFIX
 # - No checks for recursion going out of control
 # - No indentention information available
 # - No global varaible hash for code to share data.
-# - No arguments at definition use
+# - No arguments passed to fragments 
+# - Can't add to an existing fragment definition
 # ... these will all be address in the full macsrc
 #
 # ######################################################################
@@ -47,7 +49,7 @@ no warnings 'experimental::refaliasing';
 # ######################################################################
 
 my $prefix = '@.';     # user sets this on first line of file
-my $def_start = qr{ ^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
+my $def_start = qr{ ^ \s* $prefix \s* / \s* (.*?) \s* / \s* $}x;
 my $def_end   = qr{^ \s* $prefix \s* $}x;
 my $def_use   = qr{^ \s* $prefix \( \s* (.*?) \s* \) \s* $}x;
 
@@ -58,13 +60,13 @@ my @line_stack;        # the non-code lines to process
 my @result;      # the array into which code_fragments push results
 
 sub read_until($rx) {
-   my @lines = ();
-   while(<>) {
-     chomp;
-     last if(/$rx/);
-	 push @lines, $_;
-   }
-   \@lines
+	my @lines = ();
+	while(<>) {
+		chomp;
+		last if(/$rx/);
+		push @lines, $_;
+	}
+	\@lines
 }
 
 sub search_state; #fwd reference
@@ -72,20 +74,9 @@ sub search_state; #fwd reference
 # define the parsing states we can be in
 sub parse_line_state($l) {
 	if($l =~ $def_start) {
-		my ($name, $opt) = ($1, $2);
-		die "empty fragment name!" if(not ($name || $opt));
-		\my @body = read_until($def_end);
-		if(not $opt) {
-			push $code_fragments{$name}->@*, \@body;
-		} else {
-		    if($name) {
-				my $compiled = eval ('sub { ' . (join "\n", @body) . ' }');
-				push $code_fragments{$name}->@*, $compiled; 
-			} else {
-				# it's an anonymous code block to execute now!
-				eval (join "\n", @body);
-			}
-		}
+		my $name = $1;
+		die "empty fragment name!" if(not $name);
+		$code_fragments{$name} = read_until($def_end);
 		\&search_state;
 	} else {
 		push @line_stack, $l;
@@ -105,27 +96,19 @@ sub search_state($l) {
 #
 my $st = \&search_state;
 while(<>) {
-  chomp;
-  $st = &$st($_);
+	chomp;
+	$st = &$st($_);
 }
 
 # step two... run through the line stack, making replacements.
 while(scalar @line_stack) {
-  my $cur_line = shift @line_stack;
-  if ($cur_line =~ /$def_use/) {
-	@result = ();
-	foreach my $frag ($code_fragments{$1}->@*) {
-		if(ref($frag) eq 'CODE') {
-			&$frag();
-		} else {
-			push @result, $frag->@*;
-		}
+	my $cur_line = shift @line_stack;
+	if ($cur_line =~ /$def_use/) {
+		unshift @line_stack, $code_fragments{$1}->@*;
+	} else {
+		# if there's no replacement to be made, output it
+		say $cur_line;
 	}
-	unshift @line_stack, @result;	
-  } else {
-    # if there's no replacement to be made, output it
-	say $cur_line;
-  }
 }
 
 # vim:ft=perl:
