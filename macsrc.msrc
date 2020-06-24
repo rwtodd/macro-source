@@ -94,7 +94,7 @@ sub search_state($l) {
 #
 # the first line might be a prefix...
 chomp(my $line = <>);
-if($line =~ /^ \s* PREFIX: \s* (.*) \s* $/x) {
+if($line =~ /^ \s* PREFIX: \s* (.*?) \s* $/x) {
 	$prefix = $1;
 	$line = '';
 }
@@ -130,8 +130,7 @@ while(scalar @line_stack) {
 @./expand a used fragment/
 @result = ();
 $indentation = $1;
-\my @frags = $code_fragments{$2};
-die "Fragment <$2> does not exist!" if (not @frags);
+\my @frags = $code_fragments{$2} // die "Fragment <$2> not found!";
 foreach my $frag (@frags) {
 	if(ref($frag) eq 'CODE') {
  		eval "&\$frag$3";
