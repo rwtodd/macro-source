@@ -63,7 +63,7 @@ die "empty fragment name!" if(not ($name || $opt));
 if(not $opt) {
 	push $code_fragments{$name}->@*, \@body;
 } else {
-    if($name) {
+	if($name) {
 		my $compiled = eval ('sub { ' . (join "\n", @body) . ' }');
 		push $code_fragments{$name}->@*, $compiled; 
 	} else {
@@ -100,18 +100,19 @@ if($line =~ /^ \s* PREFIX: \s* (.*?) \s* $/x) {
 }
 $def_start = qr{^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
 $def_end   = qr{^ \s* $prefix \s* $}x;
-$def_use   = 
-	qr{$prefix \( \s* (.*?) \s* 
-			( \( (?: (?> [^()]+ ) | (?2) )*\) )? 
-		\s* \)
-	}x;
+$def_use   = qr{
+	$prefix \(                                # opening paren
+		\s* (.*?) \s*                         # the name of the fragment
+		( \( (?: (?> [^()]+ ) | (?2) )*\) )?  # fragment arguments
+	\s* \)                                    # closing paren
+}x;
 
 # run a state machine where $st holds the next state function to run
 # and each state function returns a ref to the next state
 my $st = search_state($line);
 while(<>) {
-  chomp;
-  $st = &$st($_);
+	chomp;
+	$st = &$st($_);
 }
 
 # step two... run through the line stack, making replacements.
@@ -121,8 +122,8 @@ while(scalar @line_stack) {
 	if ($cur_line =~ /$def_use/) {
 		@.(expand a used fragment)
 	} else {
-	  # if there's no replacement to be made, output it
-	  say $cur_line;
+		# if there's no replacement to be made, output it
+		say $cur_line;
 	}
 }
 
@@ -131,7 +132,7 @@ while(scalar @line_stack) {
 \my @frags = $code_fragments{$1} // die "Fragment <$1> not found!";
 foreach my $frag (@frags) {
 	if(ref($frag) eq 'CODE') {
- 		eval "&\$frag$2";
+		eval "&\$frag$2";
 	} else {
 		push @result, $frag->@*;
 	}
