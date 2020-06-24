@@ -1,6 +1,14 @@
 Let's check prefixes and post-fixes:
+ONE LINE (no prefix on this line)
+(no suffix on this line) ONE LINE
 pre pre ONE LINE post post
 pre pre ONE LINE middle ONE LINE post post
+MANY LINES
+AND SO FORTH
+AND SO ON (no prefix on this one)
+(no suffix on this one) MANY LINES
+                        AND SO FORTH
+                        AND SO ON
 pre pre MANY LINES
         AND SO FORTH
         AND SO ON post post
