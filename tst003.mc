@@ -10,5 +10,5 @@ $globals{number} = shift;
 @.
 
 @./read the number/p
-push @result, "${indentation}$globals{number}";
+push @result, "$globals{number}";
 @.

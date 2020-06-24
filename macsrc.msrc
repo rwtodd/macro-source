@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-use v5.030;
+use v5.30;
 use feature 'signatures';
 no warnings 'experimental::signatures';
 use feature 'refaliasing';
@@ -17,7 +17,6 @@ my @line_stack;        # the non-code lines to process
 
 my %globals;           # a place where code_fragments can store values
 my @result;            # the array into which code_fragments push results
-my $indentation = '';  # a string with the indentation preceding a used fragment 
 
 # ######################################################################
 # Assume prefix @.  First line of the file can set PREFIX: ??
@@ -32,7 +31,7 @@ my $indentation = '';  # a string with the indentation preceding a used fragment
 # push @result, 'hi there!';
 # @.
 #
-# Raw perl code:
+# Raw perl code to run during file parse:
 # @.//p
 # my $counter = 1;  # anything goes!
 # @.
@@ -102,11 +101,10 @@ if($line =~ /^ \s* PREFIX: \s* (.*?) \s* $/x) {
 $def_start = qr{^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
 $def_end   = qr{^ \s* $prefix \s* $}x;
 $def_use   = 
-	qr{^ 
-		(\s*) $prefix \( \s* (.*?) \s* 
+	qr{$prefix \( \s* (.*?) \s* 
 			( \( (?: (?> [^()]+ ) | (?2) )*\) )? 
-		\s* \) \s*
-	$}x;
+		\s* \)
+	}x;
 
 # run a state machine where $st holds the next state function to run
 # and each state function returns a ref to the next state
@@ -130,16 +128,34 @@ while(scalar @line_stack) {
 
 @./expand a used fragment/
 @result = ();
-$indentation = $1;
-\my @frags = $code_fragments{$2} // die "Fragment <$2> not found!";
+\my @frags = $code_fragments{$1} // die "Fragment <$1> not found!";
 foreach my $frag (@frags) {
 	if(ref($frag) eq 'CODE') {
- 		eval "&\$frag$3";
+ 		eval "&\$frag$2";
 	} else {
-		push @result, (map { $indentation . $_ } $frag->@*);
+		push @result, $frag->@*;
 	}
 }
+@.(indent the result)
 unshift @line_stack, @result;	
 @.
 
+@./indent the result/
+if(@result) {
+	# we have result lines, so put whatever came before the match on
+	# the first line, and whatever came after the match on the last
+	# line, then add whitespace to indent the lines.
+	$result[0] = $` . $result[0];
+	$result[$#result] .= $';
+	my $indentation = $` =~ s/\S/ /gr; # pre-match converted to whitespace
+	for my $i (1..$#result) {
+		$result[$i] = $indentation . $result[$i];
+	} 
+} else {
+	# result was empty, but we might have a prefix/postfix we need to
+	# insert anyway... if it was all whitespace then remove the line.
+	my $prepost = "$`$'";
+	push @result, $prepost if($prepost =~ m/\S/);
+}
+@.
 # vim:ft=perl:

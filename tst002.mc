@@ -9,5 +9,5 @@ How'd it go?
 
 @./count it/p
 my $cnt = shift;
-push @result, "${indentation}HELLO!" for (1..$cnt);
+push @result, "HELLO!" for (1..$cnt);
 @.

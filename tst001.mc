@@ -14,6 +14,6 @@ a *= b;
 ==
 
 ==/do something/p
-  push @result, "${indentation}b--;";
-  push @result, "${indentation}a--;";
+  push @result, "b--;";
+  push @result, "a--;";
 ==

@@ -13,5 +13,7 @@ check: macsrc
 	diff ans002.mc tmp.mc
 	./macsrc tst003.mc > tmp.mc
 	diff ans003.mc tmp.mc
+	./macsrc tst004.mc > tmp.mc
+	diff ans004.mc tmp.mc
 
 .PHONY: test clean
