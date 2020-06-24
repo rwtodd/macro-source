@@ -98,9 +98,14 @@ if($line =~ /^ \s* PREFIX: \s* (.*) \s* $/x) {
 	$prefix = $1;
 	$line = '';
 }
-$def_start = qr{ ^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
+$def_start = qr{^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
 $def_end   = qr{^ \s* $prefix \s* $}x;
-$def_use   = qr{^ (\s*) $prefix \( \s* (.*?) \s* \) \s* $}x;
+$def_use   = 
+	qr{^ 
+		(\s*) $prefix \( \s* (.*?) \s* 
+			( \( (?: (?> [^()]+ ) | (?2) )*\) )? 
+		\s* \) \s*
+	$}x;
 
 # run a state machine where $st holds the next state function to run
 # and each state function returns a ref to the next state
@@ -125,9 +130,11 @@ while(scalar @line_stack) {
 @./expand a used fragment/
 @result = ();
 $indentation = $1;
-foreach my $frag ($code_fragments{$2}->@*) {
+\my @frags = $code_fragments{$2};
+die "Fragment <$2> does not exist!" if (not @frags);
+foreach my $frag (@frags) {
 	if(ref($frag) eq 'CODE') {
- 		&$frag();
+ 		eval "&\$frag$3";
 	} else {
 		push @result, (map { $indentation . $_ } $frag->@*);
 	}
