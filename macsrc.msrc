@@ -1,10 +1,8 @@
 #!/usr/bin/perl
 
 use v5.30;
-use feature 'signatures';
-no warnings 'experimental::signatures';
-use feature 'refaliasing';
-no warnings 'experimental::refaliasing';
+use feature qw/signatures refaliasing/;
+no warnings qw/experimental::signatures experimental::refaliasing/;
 
 my $prefix = '@.';     # user sets this on first line of file
 my $def_start = undef; # regex for definition start

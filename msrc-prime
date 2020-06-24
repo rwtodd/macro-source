@@ -1,10 +1,8 @@
 #!/usr/bin/perl
 
-use v5.030;
-use feature 'signatures';
-no warnings 'experimental::signatures';
-use feature 'refaliasing';
-no warnings 'experimental::refaliasing';
+use v5.30;
+use feature qw/signatures refaliasing/;
+no warnings qw/experimental::signatures experimental::refaliasing/;
 
 # ######################################################################
 # MSRC-PRIME -- just enough of an implementation to run against 
@@ -23,29 +21,6 @@ no warnings 'experimental::refaliasing';
 # - Can't add to an existing fragment definition
 # ... these will all be address in the full macsrc
 #
-# ######################################################################
-# Assume prefix @.  First line of the file can set PREFIX: ??
-#
-# Verbatim chunk definition:
-# @./name goes here/
-# verbatim text
-# @.
-#
-# Perl subroutine chunk definition:
-# @./name goes here/p
-# push @result, 'hi there!';
-# @.
-#
-# Raw perl code:
-# @.//p
-# my $counter = 1;  # anything goes!
-# @.
-#
-# Now, inside the code, you can call on chunks like:
-# void do_it(int a) {
-#   @.(name goes here)
-#   @.(this one has args(2, 3))
-# }
 # ######################################################################
 
 my $prefix = '@.';     # user sets this on first line of file
@@ -69,9 +44,10 @@ sub read_until($rx) {
 	\@lines
 }
 
-sub search_state; #fwd reference
+# The two states parsing can be in are: "parse_line_state" and "search_state".
+# These are both subs that parse lines and return which state should be next.
 
-# define the parsing states we can be in
+sub search_state; #fwd reference
 sub parse_line_state($l) {
 	if($l =~ $def_start) {
 		my $name = $1;
@@ -92,8 +68,7 @@ sub search_state($l) {
 	}
 }
 
-# step one... read the entire input
-#
+# step one... read the entire input via the state machine defined above.
 my $st = \&search_state;
 while(<>) {
 	chomp;
@@ -106,7 +81,6 @@ while(scalar @line_stack) {
 	if ($cur_line =~ /$def_use/) {
 		unshift @line_stack, $code_fragments{$1}->@*;
 	} else {
-		# if there's no replacement to be made, output it
 		say $cur_line;
 	}
 }
