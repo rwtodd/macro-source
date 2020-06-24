@@ -1,0 +1,28 @@
+.TH macsrc "1" "19 February 2020" "@PACKAGE_STRING@" "Utility"
+.SH NAME
+macsrc -- tangle semi-literate programs
+.\"
+.\"
+.SH SYNOPSIS
+.B macsrc
+.RI [ file ]
+.\"
+.\"
+.SH DESCRIPTION
+macsrc reads files and outputs to stdout.
+.PP
+Here is another paragraph about that.
+.\"
+.\"
+.SH BUGS
+None that I know of.
+.\"
+.\"
+.SH SEE ALSO 
+.TP
+Don Knuth's Literate Programming Book
+https://www-cs-faculty.stanford.edu/~knuth/lp.html
+.\"
+.\"
+.SH AUTHOR
+Richard Todd
