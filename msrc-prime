@@ -13,6 +13,8 @@ no warnings 'experimental::refaliasing';
 #
 # LIMITATIONS of msrc-prime:
 # - Only one fragment call per line.
+# - No error checking
+# - No way to change the PREFIX
 # - No checks for recursion going out of control
 # - No indentention information available
 # - No global varaible hash for code to share data.
@@ -45,9 +47,9 @@ no warnings 'experimental::refaliasing';
 # ######################################################################
 
 my $prefix = '@.';     # user sets this on first line of file
-my $def_start = undef; # regex for definition start
-my $def_end = undef;   # regex for definition end
-my $def_use = undef;   # regex for fragment use
+my $def_start = qr{ ^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
+my $def_end   = qr{^ \s* $prefix \s* $}x;
+my $def_use   = qr{^ \s* $prefix \( \s* (.*?) \s* \) \s* $}x;
 
 my %code_fragments;    # the collected code fragments
 my $cur_frag_name;     # the fragment we are collecting
@@ -101,24 +103,13 @@ sub search_state($l) {
 
 # step one... read the entire input
 #
-# the first line might be a prefix...
-chomp(my $line = <>);
-if($line =~ /^ \s* PREFIX: \s* (.*) \s* $/x) {
-	$prefix = $1;
-	$line = '';
-}
-$def_start = qr{ ^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
-$def_end   = qr{^ \s* $prefix \s* $}x;
-$def_use   = qr{^ \s* $prefix \( \s* (.*?) \s* \) \s* $}x;
-
-my $st = search_state($line);
+my $st = \&search_state;
 while(<>) {
   chomp;
   $st = &$st($_);
 }
 
 # step two... run through the line stack, making replacements.
-
 while(scalar @line_stack) {
   my $cur_line = shift @line_stack;
   if ($cur_line =~ /$def_use/) {
