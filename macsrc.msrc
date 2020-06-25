@@ -96,13 +96,13 @@ if($line =~ /^ \s* PREFIX: \s* (.*?) \s* $/x) {
 	$prefix = $1;
 	$line = '';
 }
-$def_start = qr{^ \s* $prefix \s* / \s* (.*?) \s* / (p?) \s* $}x;
-$def_end   = qr{^ \s* $prefix \s* $}x;
+$def_start = qr{^ \s* \Q$prefix\E \s* / \s* (.*?) \s* / (p?) \s* $}x;
+$def_end   = qr{^ \s* \Q$prefix\E \s* $}x;
 $def_use   = qr{
-	$prefix \(                                # opening paren
-		\s* (.*?) \s*                         # the name of the fragment
-		( \( (?: (?> [^()]+ ) | (?2) )*\) )?  # fragment arguments
-	\s* \)                                    # closing paren
+	\Q$prefix\E \(                                     # opening paren
+		\s* (.*?) \s*                                  # fragment name
+		( \( (*PRUNE) (?: (?> [^()]+ ) | (?2) )*\) )?  # fragment arguments
+	\s* \)                                             # closing paren
 }x;
 
 # run a state machine where $st holds the next state function to run
