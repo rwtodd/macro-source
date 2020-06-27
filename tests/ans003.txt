@@ -1,5 +1,9 @@
 Let's pass some globals around (passing 4).
-And see...
+And see if it's 4...
   4
 Did it work?
+
+Ok, now let's pass a number to a function with a signature...
+  5
+Was it 5?
 

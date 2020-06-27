@@ -1,12 +1,21 @@
 
 Let's pass some globals around (passing 4).
 @.(pass a number (2+2))
-And see...
+And see if it's 4...
   @.(read the number)
 Did it work?
 
+Ok, now let's pass a number to a function with a signature...
+@.(pass another number (2+3))
+  @.(read the number)
+Was it 5?
+
 @./pass a number/p
 $globals{number} = shift;
+@.
+
+@./pass another number ($n)/p
+$globals{number} = $n;
 @.
 
 @./read the number/p

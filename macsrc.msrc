@@ -55,14 +55,14 @@ sub parse_line_state($l) {
 }
 
 @./parse a fragment definition/
-my ($name, $opt) = ($1, $2);
+my ($name, $vars, $opt) = ($1, $2, $3);
 die "empty fragment name!" if(not ($name || $opt));
 @.(read until end of fragment into @body)
 if(not $opt) {
 	push $code_fragments{$name}->@*, \@body;
 } else {
 	if($name) {
-		my $compiled = eval ('sub { ' . (join "\n", @body) . ' }');
+		my $compiled = eval ("sub$vars { " . (join "\n", @body) . ' }');
 		push $code_fragments{$name}->@*, $compiled; 
 	} else {
 		# it's an anonymous code block to execute now!
@@ -96,7 +96,10 @@ if($line =~ /^ \s* PREFIX: \s* (.*?) \s* $/x) {
 	$prefix = $1;
 	$line = '';
 }
-$def_start = qr{^ \s* \Q$prefix\E \s* / \s* (.*?) \s* / (p?) \s* $}x;
+$def_start = qr{^ 
+	\s* \Q$prefix\E / \s* (.*?) \s* 
+	( \( (*PRUNE) (?: (?> [^()]+ ) | (?2) )*\) )?  # fragment arguments
+	/ (p?) \s* $}x;
 $def_end   = qr{^ \s* \Q$prefix\E \s* $}x;
 $def_use   = qr{
 	\Q$prefix\E \(                                     # opening paren
