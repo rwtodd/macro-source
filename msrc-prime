@@ -1,88 +1,72 @@
-#!/usr/bin/env perl
+#!/usr/bin/env lua
 
-use v5.30;
-use feature qw/signatures refaliasing/;
-no warnings qw/experimental::signatures experimental::refaliasing/;
+-- ######################################################################
+-- MSRC-PRIME -- just enough of an implementation to run against 
+-- macsrc.msrc and bootstrap.  The full macsrc is written such that it
+-- only uses facilities provided by msrc-prime.
+-- 
+-- LIMITATIONS of msrc-prime:
+-- - Only one fragment call per line.
+-- - No code fragments, only replacement texts
+-- - No error checking
+-- - No way to change the PREFIX
+-- - No checks for recursion going out of control
+-- - No indentention information available
+-- - No global varaible hash for code to share data.
+-- - No arguments passed to fragments 
+-- - Can't add to an existing fragment definition
+-- ... these will all be address in the full macsrc
+-- ######################################################################
+local prefix         = '@.'
+local def_start      = '^%s*' .. prefix .. '%s*/%s*(.-)%s*/%s*$'
+local def_end        = '^%s*' .. prefix .. '%s*$'
+local def_use        = '^%s*' .. prefix .. '%s*%(%s*(.-)%s*%)%s*$'
+local line_stack     = { first = 1, last = 0 }
+local code_fragments = { }
 
-# ######################################################################
-# MSRC-PRIME -- just enough of an implementation to run against 
-# macsrc.msrc and bootstrap.  The full macsrc is written such that it
-# only uses facilities provided by msrc-prime.
-#
-# LIMITATIONS of msrc-prime:
-# - Only one fragment call per line.
-# - No code fragments, only replacement texts
-# - No error checking
-# - No way to change the PREFIX
-# - No checks for recursion going out of control
-# - No indentention information available
-# - No global varaible hash for code to share data.
-# - No arguments passed to fragments 
-# - Can't add to an existing fragment definition
-# ... these will all be address in the full macsrc
-#
-# ######################################################################
+-- The two states parsing can be in are: "parse_line_state" and "search_state".
+-- These are both functions that parse lines and return which state should be next.
+function search_state(l)  
+	return l:match('^%s*$') and search_state or parse_line_state(l)
+end
 
-my $prefix = '@.';     # user sets this on first line of file
-my $def_start = qr{ ^ \s* $prefix \s* / \s* (.*?) \s* / \s* $}x;
-my $def_end   = qr{^ \s* $prefix \s* $}x;
-my $def_use   = qr{^ \s* $prefix \( \s* (.*?) \s* \) \s* $}x;
+function parse_line_state(l)
+	local name = l:match(def_start)
+	if name then
+	    local fragment, cur = {}, io.read('l') 
+		while not cur:match(def_end) do
+			fragment[#fragment + 1], cur = cur, io.read('l')
+		end
+		code_fragments[name] = fragment
+		return search_state
+	else
+		line_stack.last             = line_stack.last + 1
+		line_stack[line_stack.last] = l
+		return parse_line_state
+	end
+end
 
-my %code_fragments;    # the collected code fragments
-my $cur_frag_name;     # the fragment we are collecting
-my @line_stack;        # the non-code lines to process
+-- input phase
+local cur_state = search_state
+while true do
+	local line = io.read('l')
+	if line == nil then break end
+	cur_state = cur_state(line)
+end
 
-my @result;      # the array into which code_fragments push results
+-- output phase
+while line_stack.first <= line_stack.last do
+	local l = line_stack[line_stack.first]
+	line_stack.first = line_stack.first + 1
+	local name = l:match(def_use)
+	if name then
+		local frag = assert(code_fragments[name], name)
+		local flen = #frag
+		line_stack.first = line_stack.first - flen 
+		table.move(frag, 1, flen, line_stack.first, line_stack)
+	else
+		print(l)
+	end
+end
 
-sub read_until($rx) {
-	my @lines = ();
-	while(<>) {
-		chomp;
-		last if(/$rx/);
-		push @lines, $_;
-	}
-	\@lines
-}
-
-# The two states parsing can be in are: "parse_line_state" and "search_state".
-# These are both subs that parse lines and return which state should be next.
-
-sub search_state; #fwd reference
-sub parse_line_state($l) {
-	if($l =~ $def_start) {
-		my $name = $1;
-		die "empty fragment name!" if(not $name);
-		$code_fragments{$name} = read_until($def_end);
-		\&search_state;
-	} else {
-		push @line_stack, $l;
-		\&parse_line_state;
-	}
-}
-
-sub search_state($l) {
-	if($l =~ m/^\s*$/) {
-		\&search_state; 
-	} else {
-		parse_line_state($l);
-	}
-}
-
-# step one... read the entire input via the state machine defined above.
-my $st = \&search_state;
-while(<>) {
-	chomp;
-	$st = &$st($_);
-}
-
-# step two... run through the line stack, making replacements.
-while(scalar @line_stack) {
-	my $cur_line = shift @line_stack;
-	if ($cur_line =~ /$def_use/) {
-		unshift @line_stack, $code_fragments{$1}->@*;
-	} else {
-		say $cur_line;
-	}
-}
-
-# vim:ft=perl:
+-- vim: filetype=lua:tabstop=4:tw=0:noet:

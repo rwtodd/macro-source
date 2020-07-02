@@ -11,6 +11,6 @@ EXTRA_DIST=macsrc.msrc
 CLEANFILES=macsrc
 
 macsrc: macsrc.msrc
-	perl "${srcdir}/msrc-prime" $< > $@
+	lua "${srcdir}/msrc-prime" < $< > $@
 	chmod +x $@
 
