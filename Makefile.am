@@ -8,9 +8,10 @@ dist_check_DATA=tests/ans001.txt  tests/ans002.txt  tests/ans003.txt  tests/ans0
 TESTS=$(dist_check_SCRIPTS)
 
 EXTRA_DIST=macsrc.msrc
-CLEANFILES=macsrc
+CLEANFILES=macsrc msrc.0
 
 macsrc: macsrc.msrc
-	lua "${srcdir}/msrc-prime" < $< > $@
+	lua "${srcdir}/msrc-prime" < $< > msrc.0 
+	lua msrc.0 < $< > $@
 	chmod +x $@
 

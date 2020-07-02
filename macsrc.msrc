@@ -1,161 +1,178 @@
-#!/usr/bin/env perl
-use feature qw/say signatures refaliasing/;
-no warnings qw/experimental/;
+#!/usr/bin/env lua
 
-my $prefix = '@.';     # user sets this on first line of file
-my $def_start = undef; # regex for definition start
-my $def_end = undef;   # regex for definition end
-my $def_use = undef;   # regex for fragment use
+--[[ #######################################################################
+Assume prefix @.  First line of the file can change it, for example:
+  PREFIX: ??
 
-my %code_fragments;    # the collected code fragments
-my $cur_frag_name;     # the fragment we are collecting
-my @line_stack;        # the non-code lines to process
+Verbatim chunk definition:
+??/name goes here/
+verbatim text
+??
 
-my %globals;           # a place where code_fragments can store values
-my @result;            # the array into which code_fragments push results
+Lua subroutine chunk definition:
+??/name goes here/l
+table.insert(result, 'hi there!')
+??
 
-# ######################################################################
-# Assume prefix @.  First line of the file can set PREFIX: ??
-#
-# Verbatim chunk definition:
-# @./name goes here/
-# verbatim text
-# @.
-#
-# Perl subroutine chunk definition:
-# @./name goes here/p
-# push @result, 'hi there!';
-# @.
-#
-# Raw perl code to run during file parse:
-# @.//p
-# my $counter = 1;  # anything goes!
-# @.
-#
-# Now, inside the code, you can call on chunks like:
-# void do_it(int a) {
-#   @.(name goes here)
-#   @.(this one has args(2, 3))
-# }
-# ######################################################################
+Raw lua code to run during file parse:
+??/()/l
+counter = 1 -- anything goes!
+??
 
-sub search_state; #fwd reference
-
-# define the parsing states we can be in
-sub parse_line_state($l) {
-	if($l =~ $def_start) {
-		@.(parse a fragment definition)
-		\&search_state;
-	} else {
-		push @line_stack, $l;
-		\&parse_line_state;
-	}
+Now, inside the code, you can call on chunks like:
+void do_it(int a) {
+  ??(name goes here)
+  ??(this one has args(2, 3))
 }
+###################################################################### ]]
+-- result is global, so it can be altered by user functions
+result = { }
+local prefix, def_start, def_templ, def_code, def_end, def_use, def_call
+local line_stack     = { first = 1, last = 0 }
+local code_fragments = { }
+local eval_env       = setmetatable({}, { __index = _G })
 
-@./parse a fragment definition/
-my ($name, $vars, $opt) = ($1, $2, $3);
-die "empty fragment name!" if(not ($name || $opt));
-@.(read until end of fragment into @body)
-if(not $opt) {
-	push $code_fragments{$name}->@*, \@body;
-} else {
-	if($name) {
-		my $compiled = eval ("sub$vars { " . (join "\n", @body) . ' }');
-		push $code_fragments{$name}->@*, $compiled; 
-	} else {
-		# it's an anonymous code block to execute now!
-		eval (join "\n", @body);
-	}
-}
+-- The two states parsing can be in are: "parse_line_state" and "search_state".
+-- These are both functions that parse lines and return which state should be next.
+function search_state(l)  
+	return l:match('^%s*$') and search_state or parse_line_state(l)
+end
+
+function parse_line_state(l)
+	local _, pfx_loc = l:find(def_start)
+	if pfx_loc then
+		@.(attempt to parse a template)
+	end
+	line_stack.last             = line_stack.last + 1
+	line_stack[line_stack.last] = l
+	return parse_line_state
+end
+
+@./attempt to parse a template/
+local name, args, opts 
+name = l:match(def_templ, pfx_loc + 1)
+if not name then
+	name, args, opts = l:match(def_code, pfx_loc + 1)
+end
+if name then
+	@.(read a fragment)
+	@.(evaluate the fragment)
+	@.(append the fragment to code_fragments)
+	return search_state
+end
 @.
 
-@./read until end of fragment into @body/
-my @body = ();
-while(<<>>) {
-	chomp;
-	last if(/$def_end/);
-	push @body, $_;
-}
+@./read a fragment/
+local frag, cur = {}, assert(io.read('l'),name)
+while not cur:match(def_end) do
+	frag[#frag + 1], cur = cur, assert(io.read('l'),name)
+end
 @.
 
-sub search_state($l) {
-	if($l =~ m/^\s*$/) {
-		\&search_state; 
-	} else {
-		parse_line_state($l);
-	}
-}
+@./evaluate the fragment/
+if opts == nil then
+	local f = frag  -- capture frag as-is...
+	frag = function() table.move(f, 1, #f, #result+1, result) end
+elseif opts == 'l' and name == '' then
+	local func = assert(load(table.concat(frag,'\n'), '', 't', eval_env))
+	func()
+elseif opts == 'l' then
+    local code, func
+	code = string.format('return function%s\n%s\nend',args or '()',table.concat(frag, '\n'))
+	func = assert(load(code, '', 't', eval_env))
+	frag = func()
+elseif opts == 't' then
+	-- to do
+else
+	assert(nil,'fragment option: ' .. opts)
+end
+@.
 
-# step one... read the entire input
-#
-# the first line might be a prefix...
-chomp(my $line = <>);
-if($line =~ /^ \s* PREFIX: \s* (.*?) \s* $/x) {
-	$prefix = $1;
-	$line = '';
-}
-$def_start = qr{^ 
-	\s* \Q$prefix\E / \s* (.*?) \s* 
-	( \( (*PRUNE) (?: (?> [^()]+ ) | (?2) )*\) )?  # fragment arguments
-	/ (p?) \s* $}x;
-$def_end   = qr{^ \s* \Q$prefix\E \s* $}x;
-$def_use   = qr{
-	\Q$prefix\E \(                                     # opening paren
-		\s* (.*?) \s*                                  # fragment name
-		( \( (*PRUNE) (?: (?> [^()]+ ) | (?2) )*\) )?  # fragment arguments
-	\s* \)                                             # closing paren
-}x;
+@./append the fragment to code_fragments/
+-- we need to account for the case where the name is not yet
+-- in the code_fragments list yet, and also just skip everything
+-- if the name is '' or the frag is nil
+if name ~= '' and frag then
+	local flist = code_fragments[name]
+	if flist then table.insert(flist,frag)
+	         else code_fragments[name] = {frag}
+	end
+end
+@.
 
-# run a state machine where $st holds the next state function to run
-# and each state function returns a ref to the next state
-my $st = search_state($line);
-while(<>) {
-	chomp;
-	$st = &$st($_);
-}
+-- input phase
+do
+	@.(set the prefix based on the first line)
+	@.(read the remaining input)
+end
 
-# step two... run through the line stack, making replacements.
+@./set the prefix based on the first line/
+local line = io.read('l')
+if line then
+	prefix = line:match('^%s*PREFIX:%s*(.-)%s*$')
+	if prefix then line = ''
+	          else prefix = '@.'
+	end
+end
+def_start = '^%s*' .. prefix .. '%s*/'
+def_templ = '^%s*(.-)%s*/%s*$'
+def_code  = '^%s*(.-)%s*(%b())%s*/(%w)%s*$'
+def_end   = '^%s*' .. prefix .. '%s*$'
+def_use   = prefix .. '%s*%(%s*([^(]-)%s*%)'
+def_call  = prefix .. '%s*%(%s*(.-)%s*(%b())%s*%)'
+@.
 
-while(scalar @line_stack) {
-	my $cur_line = shift @line_stack;
-	if ($cur_line =~ /$def_use/) {
-		@.(expand a used fragment)
-	} else {
-		# if there's no replacement to be made, output it
-		say $cur_line;
-	}
-}
+@./read the remaining input/
+local st = search_state(line)
+while true do
+	line = io.read('l')
+	if line == nil then break end
+	st = st(line)
+end
+@.
 
-@./expand a used fragment/
-@result = ();
-\my @frags = $code_fragments{$1} // die "Fragment <$1> not found!";
-foreach my $frag (@frags) {
-	if(ref($frag) eq 'CODE') {
-		eval "&\$frag$2";
-	} else {
-		push @result, $frag->@*;
-	}
-}
+-- output phase
+while line_stack.first <= line_stack.last do
+	local l = line_stack[line_stack.first]
+	line_stack.first = line_stack.first + 1
+	local pre, post, name, args
+	pre, post, name = l:find(def_use)
+	if not pre then pre, post, name, args = l:find(def_call) end
+	if name then
+		@.(format a used fragment into the line_stack)
+	else
+		print(l)
+	end
+end
+
+@./ format a used fragment into the line_stack /
+result = {}
+local fcall = string.format("frag%s", args or '()')
+for _, frag in ipairs(assert(code_fragments[name], name)) do
+	eval_env.frag = frag
+	local chunk = assert(load(fcall, '', 't', eval_env), fcall)
+	chunk()	
+end
+local rlen = #result
 @.(indent the result)
-unshift @line_stack, @result;	
+line_stack.first = line_stack.first - rlen
+table.move(result, 1, rlen, line_stack.first, line_stack)
 @.
 
-@./indent the result/
-if(@result) {
-	# we have result lines, so put whatever came before the match on
-	# the first line, and whatever came after the match on the last
-	# line, then add whitespace to indent the lines.
-	$result[0] = $` . $result[0];
-	$result[$#result] .= $';
-	my $indentation = $` =~ s/\S/ /gr; # pre-match converted to whitespace
-	for my $i (1..$#result) {
-		$result[$i] = $indentation . $result[$i];
-	} 
-} else {
-	# result was empty, but we might have a prefix/postfix we need to
-	# insert anyway... if it was all whitespace then remove the line.
-	my $prepost = "$`$'";
-	push @result, $prepost if($prepost =~ m/\S/);
-}
+@./ indent the result /
+if rlen > 0 then
+	local whitespace = l:sub(1,pre-1):gsub('%S',' ')
+	result[1]    = l:sub(1,pre-1) .. result[1]
+	for idx=2,rlen do
+		result[idx] = whitespace .. result[idx]
+	end
+	result[rlen] = result[rlen] .. l:sub(post+1)
+else
+	-- there are no results... put in the pre+post string
+	result[1] = l:sub(1,pre-1) .. l:sub(post+1)
+	if result[1]:find("%S") then
+		rlen = 1
+	end
+end
 @.
-# vim: filetype=perl:tabstop=4:tw=0:noet:
+-- vim: filetype=lua:tabstop=4:tw=0:noet:

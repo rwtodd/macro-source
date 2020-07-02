@@ -7,7 +7,8 @@ How about this one:
   @.(count it (3) )
 How'd it go?
 
-@./count it/p
-my $cnt = shift;
-push @result, "HELLO!" for (1..$cnt);
+@./count it (cnt) /l
+for i=1,cnt do
+	table.insert(result, "HELLO!")
+end
 @.

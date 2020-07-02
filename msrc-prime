@@ -33,9 +33,9 @@ end
 function parse_line_state(l)
 	local name = l:match(def_start)
 	if name then
-	    local fragment, cur = {}, io.read('l') 
+	    local fragment, cur = {}, assert(io.read('l'),name)
 		while not cur:match(def_end) do
-			fragment[#fragment + 1], cur = cur, io.read('l')
+			fragment[#fragment + 1], cur = cur, assert(io.read('l'),name)
 		end
 		code_fragments[name] = fragment
 		return search_state

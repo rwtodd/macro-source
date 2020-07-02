@@ -1,5 +1,10 @@
+Let's set up the global... to 100
+@./()/l
+number = 100
+@.
+Did it work?  @.(read the number)
 
-Let's pass some globals around (passing 4).
+Ok, Let's pass some globals around (passing 4).
 @.(pass a number (2+2))
 And see if it's 4...
   @.(read the number)
@@ -10,14 +15,14 @@ Ok, now let's pass a number to a function with a signature...
   @.(read the number)
 Was it 5?
 
-@./pass a number/p
-$globals{number} = shift;
+@./pass a number (n)/l
+number = n
 @.
 
-@./pass another number ($n)/p
-$globals{number} = $n;
+@./pass another number (n)/l
+number = n
 @.
 
-@./read the number/p
-push @result, "$globals{number}";
+@./read the number ()/l
+table.insert(result, number)
 @.

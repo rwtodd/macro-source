@@ -13,7 +13,7 @@ a += b;
 a *= b;
 ==
 
-==/do something/p
-  push @result, "b--;";
-  push @result, "a--;";
+==/do something()/l
+table.insert(result,"b--;")
+table.insert(result,"a--;")
 ==

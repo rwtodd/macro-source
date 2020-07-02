@@ -1,4 +1,7 @@
-Let's pass some globals around (passing 4).
+Let's set up the global... to 100
+Did it work?  100
+
+Ok, Let's pass some globals around (passing 4).
 And see if it's 4...
   4
 Did it work?

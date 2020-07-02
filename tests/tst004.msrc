@@ -24,7 +24,7 @@ AND SO FORTH
 AND SO ON
 @.
 
-@./empty result/p
-# nothing to do here...
-my $x = 1;
+@./empty result ()/l
+-- nothing to do here...
+local x = 1
 @.
