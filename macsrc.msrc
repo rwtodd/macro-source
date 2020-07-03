@@ -26,11 +26,13 @@ void do_it(int a) {
 }
 ###################################################################### ]]
 -- result is global, so it can be altered by user functions
-result = { }
 local prefix, def_start, def_templ, def_code, def_end, def_use, def_call
 local line_stack     = { first = 1, last = 0 }
 local code_fragments = { }
-local eval_env       = setmetatable({}, { __index = _G })
+local eval_env       = { 
+	result = {};    string=string; 
+	table=table;    math=math 
+}
 
 -- The prefix is provided by the user, and becomes part of a pattern.  So, we
 -- need to escape any pattern-special chars in it.
@@ -89,7 +91,7 @@ end
 -- t is a template where {{args}} are replaced with given arguments
 if opts == nil then
 	local f = frag  -- capture frag as-is...
-	frag = function() table.move(f, 1, #f, #result+1, result) end
+	frag = function() table.move(f, 1, #f, #eval_env.result+1, eval_env.result) end
 elseif opts == 'l' and name == '' then
 	local func = assert(load(table.concat(frag,'\n'), '', 't', eval_env))
 	func()
@@ -102,7 +104,9 @@ elseif opts == 't' then
 	@.(make sure no args are given)
 	local f = frag  -- capture frag as-is...
 	frag = function (opts)
-		for _,str in ipairs(f) do result[#result+1] = str:gsub('{{(%w+)}}',opts) end 
+		for _,str in ipairs(f) do 
+			eval_env.result[#eval_env.result+1] = str:gsub('{{(%w+)}}',opts)
+		end
 	end
 else
 	assert(nil,'fragment option: ' .. opts)
@@ -175,17 +179,25 @@ while line_stack.first <= line_stack.last do
 end
 
 @./ format a used fragment into the line_stack /
-result = {}
-local fcall = string.format("frag%s", args or '()')
+eval_env.result = {}
 for _, frag in ipairs(assert(code_fragments[name], name)) do
+	@.(expand the fragment into the result table)
+end
+local result, rlen = eval_env.result, #eval_env.result
+@.(indent the result)
+line_stack.first = line_stack.first - rlen
+table.move(result, 1, rlen, line_stack.first, line_stack)
+@.
+
+@./expand the fragment into the result table/
+if type(frag) == 'table' then
+	table.move(frag, 1, #frag, #eval_env.result+1, eval_env.result)
+else
+	local fcall = string.format("frag%s", args or '()')
 	eval_env.frag = frag
 	local chunk = assert(load(fcall, '', 't', eval_env), fcall)
 	chunk()	
 end
-local rlen = #result
-@.(indent the result)
-line_stack.first = line_stack.first - rlen
-table.move(result, 1, rlen, line_stack.first, line_stack)
 @.
 
 @./ indent the result /
