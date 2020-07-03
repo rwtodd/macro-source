@@ -1,0 +1,18 @@
+  PREFIX:  <> 
+A Manual Template test...
+
+===
+<>(go templates go ({name='Mary', dob='1971'}))
+
+   <>(go templates go ({name='JR', dob='1962'}))
+===
+
+<>/ go templates go (opts) /l
+local orig =
+[[So check if {{name}} was really
+born in {{dob}}... I'm not sure!]]
+local changed = orig:gsub("{{(%w+)}}", opts)
+for line in changed:gmatch("([^\n]*)\n?") do
+   table.insert(result, line)
+end
+<>

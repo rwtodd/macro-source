@@ -1,0 +1,10 @@
+Template code check...
+
+If your DOB is: 1901,
+   you might be John, I'd bet.
+
+-*-
+
+   If your DOB is: 1500,
+      you might be Elizabeth, I'd bet.
+

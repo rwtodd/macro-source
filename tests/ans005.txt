@@ -1,0 +1,10 @@
+A Manual Template test...
+
+===
+So check if Mary was really
+born in 1971... I'm not sure!
+
+   So check if JR was really
+   born in 1962... I'm not sure!
+===
+

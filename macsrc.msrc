@@ -32,6 +32,19 @@ local line_stack     = { first = 1, last = 0 }
 local code_fragments = { }
 local eval_env       = setmetatable({}, { __index = _G })
 
+-- The prefix is provided by the user, and becomes part of a pattern.  So, we
+-- need to escape any pattern-special chars in it.
+local escape_lua_pattern
+do
+	local matches = {
+		["^"] = "%^"; ["$"] = "%$"; ["("] = "%("; [")"] = "%)";
+		["%"] = "%%"; ["."] = "%."; ["["] = "%["; ["]"] = "%]";
+		["*"] = "%*"; ["+"] = "%+"; ["-"] = "%-"; ["?"] = "%?";
+		["\0"] = "%z";
+	}
+	escape_lua_pattern = function(s) return (s:gsub(".", matches)) end
+end
+
 -- The two states parsing can be in are: "parse_line_state" and "search_state".
 -- These are both functions that parse lines and return which state should be next.
 function search_state(l)  
@@ -70,6 +83,10 @@ end
 @.
 
 @./evaluate the fragment/
+-- depending on the selected option, we will evaluate the fragment
+-- So, no option generates a table-moving function, 
+-- l is lua code, and it's executed immediately if the name is blank
+-- t is a template where {{args}} are replaced with given arguments
 if opts == nil then
 	local f = frag  -- capture frag as-is...
 	frag = function() table.move(f, 1, #f, #result+1, result) end
@@ -82,9 +99,19 @@ elseif opts == 'l' then
 	func = assert(load(code, '', 't', eval_env))
 	frag = func()
 elseif opts == 't' then
-	-- to do
+	@.(make sure no args are given)
+	local f = frag  -- capture frag as-is...
+	frag = function (opts)
+		for _,str in ipairs(f) do result[#result+1] = str:gsub('{{(%w+)}}',opts) end 
+	end
 else
 	assert(nil,'fragment option: ' .. opts)
+end
+@.
+
+@./make sure no args are given/
+if args ~= '()' then
+	assert(nil, 'Args must be () for template fragments: ' .. name)
 end
 @.
 
@@ -114,6 +141,8 @@ if line then
 	          else prefix = '@.'
 	end
 end
+prefix = escape_lua_pattern(prefix)
+
 def_start = '^%s*' .. prefix .. '%s*/'
 def_templ = '^%s*(.-)%s*/%s*$'
 def_code  = '^%s*(.-)%s*(%b())%s*/(%w)%s*$'

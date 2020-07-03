@@ -17,7 +17,7 @@
 -- - Can't add to an existing fragment definition
 -- ... these will all be address in the full macsrc
 -- ######################################################################
-local prefix         = '@.'
+local prefix         = '@%.'
 local def_start      = '^%s*' .. prefix .. '%s*/%s*(.-)%s*/%s*$'
 local def_end        = '^%s*' .. prefix .. '%s*$'
 local def_use        = '^%s*' .. prefix .. '%s*%(%s*(.-)%s*%)%s*$'
