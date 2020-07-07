@@ -1,0 +1,9 @@
+Here's a test of fragments that define new fragments.
+@.(define constant('ONE',21.232))
+@.(define constant('TWO',[['RAE']]))
+a,b = @.(ONE), @.(TWO)
+
+@./ define constant (name, value) / ~~~~~~~~~~~~~~~~~~~~~~~~~~
+add_fragment(name, { value.." --[["..name.."]]" })
+@. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

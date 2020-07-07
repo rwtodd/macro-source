@@ -1,0 +1,3 @@
+Here's a test of fragments that define new fragments.
+a,b = 21.232 --[[ONE]], 'RAE' --[[TWO]]
+
