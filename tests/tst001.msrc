@@ -13,7 +13,7 @@ a += b;
 a *= b;
 ==
 
-==/do something()/l
+==/do something()/
 table.insert(result,"b--;")
 table.insert(result,"a--;")
 ==

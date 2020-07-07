@@ -1,5 +1,5 @@
 Let's set up the global... to 100
-@./()/l
+@./()/
 number = 100
 @.
 Did it work?  @.(read the number)
@@ -15,14 +15,14 @@ Ok, now let's pass a number to a function with a signature...
   @.(read the number)
 Was it 5?
 
-@./pass a number (n)/l
+@./pass a number (n)/
 number = n
 @.
 
-@./pass another number (n)/l
+@./pass another number (n)/
 number = n
 @.
 
-@./read the number ()/l
+@./read the number ()/
 table.insert(result, number)
 @.

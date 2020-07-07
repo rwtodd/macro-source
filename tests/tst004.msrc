@@ -24,7 +24,7 @@ AND SO FORTH
 AND SO ON
 @.
 
-@./empty result ()/l
+@./empty result ()/
 -- nothing to do here...
 local x = 1
 @.

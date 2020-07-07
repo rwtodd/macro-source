@@ -7,7 +7,7 @@ How about this one:
   @.(count it (3) )
 How'd it go?
 
-@./count it (cnt) /l
+@./count it (cnt) /
 for i=1,cnt do
 	table.insert(result, "HELLO!")
 end

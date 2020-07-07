@@ -5,18 +5,22 @@ Assume prefix @.  First line of the file can change it, for example:
   PREFIX: ??
 
 Verbatim chunk definition:
-??/name goes here/
+??/name goes here, no parens allowed/
 verbatim text
 ??
 
 Lua subroutine chunk definition:
-??/name goes here/l
+??/name goes here()/
 table.insert(result, 'hi there!')
 ??
 
 Raw lua code to run during file parse:
-??/()/l
+??/()/
 counter = 1 -- anything goes!
+??
+
+Template chunk:
+??/name here/t
 ??
 
 Now, inside the code, you can call on chunks like:
@@ -26,7 +30,8 @@ void do_it(int a) {
 }
 ###################################################################### ]]
 -- result is global, so it can be altered by user functions
-local prefix, def_start, def_templ, def_code, def_end, def_use, def_call
+local prefix
+local def_start, def_frag, def_code, def_templ, def_end, def_use, def_call
 local line_stack     = { first = 1, last = 0 }
 local code_fragments = { }
 local eval_env       = { 
@@ -56,18 +61,18 @@ end
 function parse_line_state(l)
 	local _, pfx_loc = l:find(def_start)
 	if pfx_loc then
-		@.(attempt to parse a template)
+		@.(attempt to parse a definition)
 	end
 	line_stack.last             = line_stack.last + 1
 	line_stack[line_stack.last] = l
 	return parse_line_state
 end
 
-@./attempt to parse a template/
+@./attempt to parse a definition/
 local name, args, opts 
-name = l:match(def_templ, pfx_loc + 1)
-if not name then
-	name, args, opts = l:match(def_code, pfx_loc + 1)
+name, opts = l:match(def_frag, pfx_loc + 1)
+if not name then 
+	name, args = l:match(def_code, pfx_loc + 1)
 end
 if name then
 	@.(read a fragment)
@@ -85,37 +90,36 @@ end
 @.
 
 @./evaluate the fragment/
--- depending on the selected option, we will evaluate the fragment
--- So, no option generates a table-moving function, 
--- l is lua code, and it's executed immediately if the name is blank
--- t is a template where {{args}} are replaced with given arguments
-if opts == nil then
+-- depending on how the l:match'es went, we will be in one of these
+-- states:
+--   1) name set, args nil, opts = ''     TEXT FRAGMENT
+--   2) name set, args nil, opts = 't'    TEMPLATE
+--   3) name set, args set, opts nil      CODE FRAGMENT
+--   4) name '',  args set, opts nil      IMMEDIATE CODE
+if not args then
 	local f = frag  -- capture frag as-is...
-	frag = function() table.move(f, 1, #f, #eval_env.result+1, eval_env.result) end
-elseif opts == 'l' and name == '' then
-	local func = assert(load(table.concat(frag,'\n'), '', 't', eval_env))
-	func()
-elseif opts == 'l' then
-    local code, func
-	code = string.format('return function%s\n%s\nend',args or '()',table.concat(frag, '\n'))
-	func = assert(load(code, '', 't', eval_env))
-	frag = func()
-elseif opts == 't' then
-	@.(make sure no args are given)
-	local f = frag  -- capture frag as-is...
-	frag = function (opts)
-		for _,str in ipairs(f) do 
-			eval_env.result[#eval_env.result+1] = str:gsub('{{(%w+)}}',opts)
+	if opts==''
+	then   -- TEXT FRAGMENT
+		frag = function()
+			table.move(f, 1, #f, #eval_env.result+1, eval_env.result)
+		end
+	else   -- TEMPLATE
+		frag = function (opts)
+			for _,str in ipairs(f) do 
+				eval_env.result[#eval_env.result+1] = str:gsub('{{(%w+)}}',opts)
+			end
 		end
 	end
 else
-	assert(nil,'fragment option: ' .. opts)
-end
-@.
-
-@./make sure no args are given/
-if args ~= '()' then
-	assert(nil, 'Args must be () for template fragments: ' .. name)
+	if name == '' then  -- IMMEDIATE CODE
+		local func = assert(load(table.concat(frag,'\n'), '', 't', eval_env))
+		func()
+	else   -- CODE FRAGMENT
+    	local code, func
+		code = string.format('return function%s\n%s\nend',args,table.concat(frag, '\n'))
+		func = assert(load(code, '', 't', eval_env))
+		frag = func()
+	end
 end
 @.
 
@@ -123,7 +127,7 @@ end
 -- we need to account for the case where the name is not yet
 -- in the code_fragments list yet, and also just skip everything
 -- if the name is '' or the frag is nil
-if name ~= '' and frag then
+if name ~= '' then
 	local flist = code_fragments[name]
 	if flist then table.insert(flist,frag)
 	         else code_fragments[name] = {frag}
@@ -148,11 +152,13 @@ end
 prefix = escape_lua_pattern(prefix)
 
 def_start = '^%s*' .. prefix .. '%s*/'
-def_templ = '^%s*(.-)%s*/%s*$'
-def_code  = '^%s*(.-)%s*(%b())%s*/(%w)%s*$'
+def_frag  = '^%s*([^(]-)%s*/(t?)%s*$'
+def_code  = '^%s*(.-)%s*(%b())%s*/%s*$'
 def_end   = '^%s*' .. prefix .. '%s*$'
-def_use   = prefix .. '%s*%(%s*([^(]-)%s*%)'
-def_call  = prefix .. '%s*%(%s*(.-)%s*(%b())%s*%)'
+
+def_use_start = prefix .. '%s*%(%s*([^({})]-)%s*[(){]'
+def_call      = '(%b())%s*%)'
+def_tbl_call  = '(%b{})%s*%)'
 @.
 
 @./read the remaining input/
@@ -168,15 +174,34 @@ end
 while line_stack.first <= line_stack.last do
 	local l = line_stack[line_stack.first]
 	line_stack.first = line_stack.first + 1
-	local pre, post, name, args
-	pre, post, name = l:find(def_use)
-	if not pre then pre, post, name, args = l:find(def_call) end
-	if name then
+	local pre, post, name, char, args
+	pre, post, name = l:find(def_use_start)
+	if pre then
+		@.(determine the call format)
+	end
+	if args then
 		@.(format a used fragment into the line_stack)
 	else
 		print(l)
 	end
 end
+
+@./ determine the call format/
+-- if it just ends with a ')' then it's a plain fragment call
+-- otherwise, try to match arguments types as list or table
+-- In any case, leave 'args' set if we matched, and post is the
+-- end of the total match
+if l:sub(post,post) == ')' then
+	args = '()'
+else
+	local post2
+	_, post2, args = l:find(def_call,post)
+	if not args then
+		_, post2, args = l:find(def_tbl_call,post)
+	end
+	post = post2
+end
+@.
 
 @./ format a used fragment into the line_stack /
 eval_env.result = {}
@@ -193,7 +218,7 @@ table.move(result, 1, rlen, line_stack.first, line_stack)
 if type(frag) == 'table' then
 	table.move(frag, 1, #frag, #eval_env.result+1, eval_env.result)
 else
-	local fcall = string.format("frag%s", args or '()')
+	local fcall = string.format("frag%s", args)
 	eval_env.frag = frag
 	local chunk = assert(load(fcall, '', 't', eval_env), fcall)
 	chunk()	
@@ -203,7 +228,7 @@ end
 @./ indent the result /
 if rlen > 0 then
 	local whitespace = l:sub(1,pre-1):gsub('%S',' ')
-	result[1]    = l:sub(1,pre-1) .. result[1]
+	result[1] = l:sub(1,pre-1) .. result[1]
 	for idx=2,rlen do
 		result[idx] = whitespace .. result[idx]
 	end

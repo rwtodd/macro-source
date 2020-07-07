@@ -7,7 +7,7 @@ A Manual Template test...
    <>(go templates go ({name='JR', dob='1962'}))
 ===
 
-<>/ go templates go (opts) /l
+<>/ go templates go (opts) /
 local orig =
 [[So check if {{name}} was really
 born in {{dob}}... I'm not sure!]]

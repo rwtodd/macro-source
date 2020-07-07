@@ -1,13 +1,13 @@
 PREFIX:     ?*?
 Template code check...
 
-?*?(go templates ({dob='1901', name='John'}))
+?*?(go templates {dob='1901', name='John'})
 
 -*-
 
    ?*?(go templates ({dob='1500', name='Elizabeth'}))
 
-?*? / go templates ()/t
+?*? / go templates /t
 If your DOB is: {{dob}},
    you might be {{name}}, I'd bet.
 ?*?
