@@ -12,6 +12,6 @@ CLEANFILES=macsrc msrc.0
 
 macsrc: macsrc.msrc
 	lua "${srcdir}/msrc-prime" < $< > msrc.0 
-	lua msrc.0 < $< > $@
+	(echo '#!/usr/bin/env lua' ; luac -o - msrc.0 ) > $@
 	chmod +x $@
 

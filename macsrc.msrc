@@ -34,22 +34,16 @@ local prefix
 local def_start, def_frag, def_code, def_end
 local def_use_start, def_call, def_tbl_call
 local line_stack     = { first = 1, last = 0 }
-local code_fragments = { }
+local code_fragments = setmetatable({},
+	{ __index = function(tbl,k) local ans={} rawset(tbl,k,ans) return ans end })
 local eval_env       = { 
+	-- add basics from the stdlib
 	result = {};    string=string; 
-	table=table;    math=math 
-}
+	table=table;    math=math;
 
--- provide a way to put a new code fragment into the list,
--- accounting for the fact that this may be the first fragment
--- added for a given name
-function add_fragment(name, frag)
-	local flist = code_fragments[name]
-	if flist then table.insert(flist,frag)
-	         else code_fragments[name] = {frag}
-	end
-end
-eval_env.add_fragment = add_fragment
+	-- provide a way for users to dynamically add code fragments
+	add_fragment = function(name, frag) table.insert(code_fragments[name],frag) end
+}
 
 -- The prefix is provided by the user, and becomes part of a pattern.  So, we
 -- need to escape any pattern-special chars in it.
@@ -67,7 +61,7 @@ end
 -- The two states parsing can be in are: "parse_line_state" and "search_state".
 -- These are both functions that parse lines and return which state should be next.
 function search_state(l)  
-	return l:match('^%s*$') and search_state or parse_line_state(l)
+	return l:find('^%s*$') and search_state or parse_line_state(l)
 end
 
 function parse_line_state(l)
@@ -89,7 +83,7 @@ end
 if name then
 	@.(read a fragment)
 	@.(evaluate the fragment)
-	if name ~= '' then add_fragment(name, frag) end
+	if name ~= '' then table.insert(code_fragments[name],frag) end
 	return search_state
 end
 @.
@@ -205,7 +199,11 @@ end
 
 @./ format a used fragment into the line_stack /
 eval_env.result = {}
-for _, frag in ipairs(assert(code_fragments[name], name)) do
+local used_frag = rawget(code_fragments,name)
+if not used_frag then
+	error('Fragment named <' .. name .. '> does not exist!')
+end
+for _, frag in ipairs(used_frag) do
 	@.(expand the fragment into the result table)
 end
 local result, rlen = eval_env.result, #eval_env.result
