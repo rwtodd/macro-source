@@ -1,0 +1,6 @@
+PREFIX: %%%
+%%%(example text)
+%%%(example text)
+%%%/ example text () / =================
+include_file('example.text')
+%%% ====================================

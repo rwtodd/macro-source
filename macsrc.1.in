@@ -10,13 +10,20 @@ macsrc -- tangle semi-literate programs
 .\"
 .\"
 .SH DESCRIPTION
-The macsrc utility enables the
+The macsrc utility performs the
 .I tangle
 operation of literate programming,
-letting the programmer organize the code for human convenience in two ways.
-First, the code can be split code into logical, named chunks.
-Second, the tangler acts as a macro system, allowing arbitrary generated code
-to be injected into the source file.
+letting the programmer organize source code for human convenience.  For
+example, when programmers split off large nested steps into functions, they
+do it mostly for their own sanity rather than for the compiler's benefit.
+By tangling code, source can be presented to both the programmer and the
+compiler in the most suitable form possible.
+.PP
+The programmer creates msrc input by splitting code into named chunks, or
+macros.  These chunks
+have a span of capabilities from simple text-replacement to full-blown lua
+functions which take arguments.  Examples of the different types of macros
+are given in the sections below.
 .PP
 The
 .I weaving
@@ -71,14 +78,14 @@ text.
 .ft P
 .fi
 .RE
-.SS "NAMED CHUNKS"
+.SS "NAMED CHUNKS (MACROS)"
 .PP
 There are mutliple types of named chunks available to the programmer.  They
 can be defined anywhere in the file (the whole file is scanned before
-processing takes place).  Multiple chunks with the same name are all called
-in the order defined, on every use.
+processing takes place).  Multiple chunks with the same name all take effect
+when called, and are called in the order defined, on every use.
 .PP
-If the prefix is "@.", chunks are called with "@.(name)" and defined
+When the prefix is "@.", chunks are called with "@.(name)" and defined
 with "@./name/".  Definitions are completed with a line containing only the
 prefix.
 .PP
@@ -215,12 +222,12 @@ end
 .ft P
 .fi
 .RE
-.SS "RUNTIME CHUNKS"
+.SS "RUNTIME MACRO DEFINITION"
 .PP
-A lua chunk can define a replacement-style chunk by using the
-.I "add_fragment"
+A lua chunk can define a macro by using the
+.I "add_macro"
 function.  An example is given below, where a lua
-chunk defines two named replacement chunks representing
+chunk defines two text-replacement chunks representing
 constants:
 .PP
 .RS
@@ -231,7 +238,7 @@ constants:
 a,b = @.(ONE), @.(TWO)
 
 @./ define constant (name, value) / ~~~~~~~~~~~~~~
-add_fragment(name, { value.." --[["..name.."]]" })
+add_macro(name, { value.." --[["..name.."]]" })
 @. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .ft P
 .fi
@@ -243,6 +250,32 @@ The result of processing the above file gives:
 .nf
 .ft CR
 a,b = 21.232 --[[ONE]], 'RAE' --[[TWO]]
+.ft P
+.fi
+.RE
+.PP
+When the second argument to
+.I add_macro
+is a table, the result is a text-replacement macro.  When the argument is a
+function, that a lua-function macro is created.
+.SS "RUNTIME MACRO DEFINITION"
+.PP
+A lua chunk can insert the text of a file by using the
+.I "include_file"
+function, giving it the desired filename.  The included text is scanned for
+macro invocations, but not for new definitions.  The primary purpose of this
+capability is for macros to be able to pull in large swaths of canned
+text--think of the header and footer of an HTML page, for example.
+.PP
+.RS
+.nf
+.ft CR
+@.(header text)
+ ...
+
+@./ header text () / ~~~~~~~~~~~~~~
+include_file('header.html')
+@. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .ft P
 .fi
 .RE

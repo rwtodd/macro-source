@@ -1,49 +1,35 @@
 #!/usr/bin/env lua
 
---[[ #######################################################################
-Assume prefix @.  First line of the file can change it, for example:
-  PREFIX: ??
-
-Verbatim chunk definition:
-??/name goes here, no parens allowed/
-verbatim text
-??
-
-Lua subroutine chunk definition:
-??/name goes here()/
-table.insert(result, 'hi there!')
-??
-
-Raw lua code to run during file parse:
-??/()/
-counter = 1 -- anything goes!
-??
-
-Template chunk:
-??/name here/t
-??
-
-Now, inside the code, you can call on chunks like:
-void do_it(int a) {
-  ??(name goes here)
-  ??(this one has args(2, 3))
-}
-###################################################################### ]]
--- result is global, so it can be altered by user functions
+-- define the prefix-dependent variables, which will be set
+-- once the prefix is read
 local prefix
 local def_start, def_frag, def_code, def_end
 local def_use_start, def_call, def_tbl_call
+
+-- the line stack contains input lines to process
 local line_stack     = { first = 1, last = 0 }
+
+-- code_fragments contains all the named macros the user might call.
+-- calls into lua are make within the `eval_env` sandbox
 local code_fragments = setmetatable({},
 	{ __index = function(tbl,k) local ans={} rawset(tbl,k,ans) return ans end })
 local eval_env       = { 
 	-- add basics from the stdlib
 	result = {};    string=string; 
 	table=table;    math=math;
-
-	-- provide a way for users to dynamically add code fragments
-	add_fragment = function(name, frag) table.insert(code_fragments[name],frag) end
 }
+
+-- provide a way for users to dynamically add named macros 
+function eval_env.add_macro(name, frag)
+	table.insert(code_fragments[name],frag)
+end
+
+-- provide a way for users to insert external files into the output
+-- N.B. the file can call macros, but not define them
+function eval_env.include_file(name)
+	local res = eval_env.result
+	for ln in io.lines(name) do table.insert(res,ln) end
+end
 
 -- The prefix is provided by the user, and becomes part of a pattern.  So, we
 -- need to escape any pattern-special chars in it.
@@ -55,7 +41,7 @@ do
 		["*"] = "%*"; ["+"] = "%+"; ["-"] = "%-"; ["?"] = "%?";
 		["\0"] = "%z";
 	}
-	escape_lua_pattern = function(s) return (s:gsub(".", matches)) end
+	escape_lua_pattern = function(s) return s:gsub(".", matches) end
 end
 
 -- The two states parsing can be in are: "parse_line_state" and "search_state".
@@ -104,8 +90,7 @@ end
 --   4) name '',  args set, opts nil      IMMEDIATE CODE
 if not args then
 	local f = frag  -- capture frag as-is...
-	if opts==''
-	then   -- TEXT FRAGMENT
+	if opts=='' then   -- TEXT FRAGMENT
 		frag = function()
 			table.move(f, 1, #f, #eval_env.result+1, eval_env.result)
 		end
@@ -136,7 +121,7 @@ do
 end
 
 @./set the prefix based on the first line/
-local line = io.read('l')
+local line = io.read('l') or ''
 if line then
 	prefix = line:match('^%s*PREFIX:%s*(.-)%s*$')
 	if prefix then line = ''

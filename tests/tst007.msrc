@@ -4,6 +4,6 @@ Here's a test of fragments that define new fragments.
 a,b = @.(ONE), @.(TWO)
 
 @./ define constant (name, value) / ~~~~~~~~~~~~~~~~~~~~~~~~~~
-add_fragment(name, { value.." --[["..name.."]]" })
+add_macro(name, { value.." --[["..name.."]]" })
 @. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
