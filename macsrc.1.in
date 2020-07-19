@@ -5,13 +5,247 @@ macsrc -- tangle semi-literate programs
 .\"
 .SH SYNOPSIS
 .B macsrc
-.RI [ file ]
+.RI [ <infile ]
+.RI [ >outfile ]
 .\"
 .\"
 .SH DESCRIPTION
-macsrc reads files and outputs to stdout.
+The macsrc utility enables the
+.I tangle
+operation of literate programming,
+letting the programmer organize the code for human convenience in two ways.
+First, the code can be split code into logical, named chunks.
+Second, the tangler acts as a macro system, allowing arbitrary generated code
+to be injected into the source file.
 .PP
-Here is another paragraph about that.
+The
+.I weaving
+half of literate programming does not exist in this system--code is not
+written with any intention of building a typeset book, and any block comments
+on a chunk of code can be written as code comments instead.
+.PP
+macsrc always reads stdin and outputs to stdout.  A typical
+.I makefile
+would have rules like:
+.PP
+.RS
+%.c: %.msrc
+.br
+	macsrc < $< > $@
+.RE
+.SH SYNTAX
+.SS THE PREFIX
+.PP
+The syntax of macsrc input is designed to hide well in source code of all
+types.  All commands are prefixed with a unique identifier that the user can
+specify.
+A prefix should be chosen that
+won't naturally appear anywhere except in macsrc commands--no method to
+"escape" the prefix is provided.  To compensate for this potential
+inconvenience, the only restriction on the user-defined prefix is that it
+cannot start or end with whitespace.  To define a prefix of "{* CMD *}", for example,
+put the following in the first line of the file:
+.PP
+.RS
+.nf
+.ft CR
+PREFIX: {* CMD *}
+.ft P
+.fi
+.RE
+.PP
+If a user doesn't give a prefix, "@." is the default.
+.SS "BANNERS"
+.PP
+To help named chunks stand out from the main code lines, any number
+of '=', '*', or '~' characters can be mixed with the whitespace following
+the beginning and ending lines.
+.PP
+.RS
+.nf
+.ft CR
+@./ my named chunk / **********************************
+here is the replacement
+text.
+@. ****************************************************
+.ft P
+.fi
+.RE
+.SS "NAMED CHUNKS"
+.PP
+There are mutliple types of named chunks available to the programmer.  They
+can be defined anywhere in the file (the whole file is scanned before
+processing takes place).  Multiple chunks with the same name are all called
+in the order defined, on every use.
+.PP
+If the prefix is "@.", chunks are called with "@.(name)" and defined
+with "@./name/".  Definitions are completed with a line containing only the
+prefix.
+.PP
+The simplest type of chunk is just a raw string replacement.
+.PP
+.RS
+.nf
+.ft CR
+total += @.(the three scaled factors);
+
+@./ the three scaled factors /  ~~~~~~~~~~~~~~~~
+/* a description of the code can go here */
+f1 * 0.1 + f2 * 0.2 + f3 * 0.21
+@. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ft P
+.fi
+.RE
+.PP
+The result after processing would be:
+.PP
+.RS
+.nf
+.ft CR
+total += /* a description of the code can go here */
+         f1 * 0.1 + f2 * 0.2 + f3 * 0.21;
+.ft P
+.fi
+.RE
+.PP
+Note that a chunk can itself call further chunks:
+.PP
+.RS
+.nf
+.ft CR
+if (!x) { @.(do the three steps) }
+
+@./ do the three steps / *****************
+@.(do step one)
+@.(do step two)
+@.(do step three)
+@. ***************************************
+
+@./ do step one /  ***********************
+printf("Step one!\\n");
+@. ***************************************
+
+/* ... etc. ... */
+.ft P
+.fi
+.RE
+.PP
+Another type of named chunk is a template, which replaces {{keywords}} with
+text provided from the call site.  These are defined with a '/t' modifier:
+.PP
+.RS
+.nf
+.ft CR
+if (r < 0) {
+  @.(complain {msg='r is less than zero!', code='A103'})
+} else if (r == 0) {
+  @.(complain {msg='r is zero!', code='A112'})
+}
+
+@./ complain /t ==========================
+log.error("Error {{code}}: {{msg}}");
+MsgBoxW(L"Error {{code}}");
+@. =======================================
+.ft P
+.fi
+.RE
+.PP
+The result after processing would be:
+.PP
+.RS
+.nf
+.ft CR
+if (r < 0) {
+  log.error("Error A103: r is less than zero!");
+  MsgBoxW(L"Error A103");
+} else if (r == 0) {
+  log.error("Error A112: r is zero!");
+  MsgBoxW(L"Error A112");
+}
+.ft P
+.fi
+.RE
+.PP
+If a chunk is defined to take arguments, it is interpreted as lua code.  In
+this case, the code is expected to place strings in the
+.I results
+table, which will be copied into the source.
+.PP
+.RS
+.nf
+.ft CR
+const double sin_21 = @(calculate sin(2.1));
+const double sin_31 = @(calculate sin(3.1));
+
+@.( repeat name ('Microsoft Bob',10) )
+
+@./ calculate sin (n) /  =====================
+table.insert(result, tostring(math.sin(n)))
+@.  ==========================================
+
+@./ repeat name (name, count) /    ===========
+local line = [[printf("]] .. name .. [[");]]
+for x = 1,count do
+  table.insert(result, line)
+end
+@. ===========================================
+.ft P
+.fi
+.RE
+.PP
+A final special case of a lua chunk is one without a name.  These are
+executed immediately while the file is being parsed.  They can't produce
+output, but they can set variables and define functions that other lua
+chunks can use.  Since these can't be called by the user, the argument list
+should be empty.
+.RS
+.nf
+.ft CR
+@./()/
+num_repeats = 3
+@.
+
+@./ repeat name (name) /
+for x = 1, num_repeats do
+  table.insert(result, name)
+end
+@.
+
+@.(repeat name ('Microsoft Bob'))
+.ft P
+.fi
+.RE
+.SS "RUNTIME CHUNKS"
+.PP
+A lua chunk can define a replacement-style chunk by using the
+.I "add_fragment"
+function.  An example is given below, where a lua
+chunk defines two named replacement chunks representing
+constants:
+.PP
+.RS
+.nf
+.ft CR
+@.(define constant('ONE',21.232))
+@.(define constant('TWO',[['RAE']]))
+a,b = @.(ONE), @.(TWO)
+
+@./ define constant (name, value) / ~~~~~~~~~~~~~~
+add_fragment(name, { value.." --[["..name.."]]" })
+@. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ft P
+.fi
+.RE
+.PP
+The result of processing the above file gives:
+.PP
+.RS
+.nf
+.ft CR
+a,b = 21.232 --[[ONE]], 'RAE' --[[TWO]]
+.ft P
+.fi
+.RE
 .\"
 .\"
 .SH BUGS
@@ -20,9 +254,12 @@ None that I know of.
 .\"
 .SH SEE ALSO 
 .TP
+.UR https://www-cs-faculty.stanford.edu/~knuth/lp.html
 Don Knuth's Literate Programming Book
-https://www-cs-faculty.stanford.edu/~knuth/lp.html
+.UE
 .\"
 .\"
 .SH AUTHOR
 Richard Todd
+.\"
+.\" vim: tw=77 :
