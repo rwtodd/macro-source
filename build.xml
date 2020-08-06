@@ -1,0 +1,60 @@
+<?xml version = "1.0"?>
+<project name = "Macro Source" default = "info">
+  <property name = "src.dir" value = "src"/>
+  <property name = "res.dir" value = "resources"/>
+  <property name = "dest.dir" value = "mods" />
+  <property name = "lib.dir" value = "mlib" />
+  
+  <presetdef name="javac">
+    <javac includeantruntime="false" />
+  </presetdef>
+
+  <target name = "info">
+    <echo>Ant build script for the macro source tool. Targets are compile, jar, run</echo>
+  </target>
+	
+  <!-- ================================= 
+       target: build              
+       ================================= -->
+  <target name="compile" depends="" description="compile the classes">
+    <mkdir dir="${dest.dir}"/>
+    <javac modulesourcepath="${src.dir}" release="14" destdir="${dest.dir}" />
+    <copy file="${res.dir}/HelpText.txt"
+          todir="${dest.dir}/org.rwtodd.macsrc/" />
+  </target>
+  
+  <!-- ================================= 
+       target: jar              
+       ================================= -->
+  <target name="jar" depends="compile" description="build the jar file">
+    <mkdir dir="${lib.dir}"/>
+    <jar destfile="${lib.dir}/org.rwtodd.macsrc.jar" level="9">
+      <fileset dir="${dest.dir}/org.rwtodd.macsrc" />
+    </jar>
+    <!-- update the jar to make it executable... ant doesn't support this yet -->
+    <exec executable="jar">
+      <arg value="--update"/>
+      <arg value="-e"/>
+      <arg value="org.rwtodd.macsrc.Cmd" />
+      <arg value="--file"/>
+      <arg value="${lib.dir}/org.rwtodd.macsrc.jar"/>
+    </exec>
+  </target>
+
+  <!-- ================================= 
+       target: run
+       ================================= -->
+  <target name="run" depends="compile" description="run the program">
+    <java module="org.rwtodd.macsrc" classname="org.rwtodd.macsrc.Cmd" fork="true">
+    </java>
+  </target> 
+
+  <!-- ================================= 
+       target: clean
+       ================================= -->
+  <target name="clean" description="remove all build artifacts">
+    <delete quiet="true" dir="mlib" />
+    <delete quiet="true" dir="mods" />
+  </target>
+  
+</project>
