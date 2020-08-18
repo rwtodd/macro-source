@@ -3,6 +3,7 @@
 -- define the prefix-dependent variables, which will be set
 -- once the prefix is read
 local prefix
+local line_esc = "@%.\\$"
 local def_start, def_frag, def_code, def_end
 local def_use_start, def_call, def_tbl_call
 
@@ -44,6 +45,25 @@ do
 	escape_lua_pattern = function(s) return s:gsub(".", matches) end
 end
 
+-- When reading lines, we need to allow newlines to be escaped with
+-- PREFIX\, so check for that here:
+function read_next_line()
+	local l = io.read('l')
+	if not l then return nil end
+
+	local lesc = l:find(line_esc)
+	if not lesc then return l end
+
+	local lines = { }
+	while lesc do
+		table.insert(lines, l:sub(1,lesc-1))
+		l = io.read('l') or ''
+		lesc = l:find(line_esc)
+    end
+	table.insert(lines,l)
+	return table.concat(lines)
+end
+
 -- The two states parsing can be in are: "parse_line_state" and "search_state".
 -- These are both functions that parse lines and return which state should be next.
 function search_state(l)  
@@ -75,9 +95,9 @@ end
 @.
 
 @./read a fragment/
-local frag, cur = {}, assert(io.read('l'),name)
+local frag, cur = {}, assert(read_next_line(),name)
 while not cur:match(def_end) do
-	frag[#frag + 1], cur = cur, assert(io.read('l'),name)
+	frag[#frag + 1], cur = cur, assert(read_next_line(),name)
 end
 @.
 
@@ -121,7 +141,7 @@ do
 end
 
 @./set the prefix based on the first line/
-local line = io.read('l') or ''
+local line = read_next_line() or ''
 if line then
 	prefix = line:match('^%s*PREFIX:%s*(.-)%s*$')
 	if prefix then line = ''
@@ -130,6 +150,7 @@ if line then
 end
 prefix = escape_lua_pattern(prefix)
 
+line_esc  = prefix .. '\\$'
 def_start = '^%s*' .. prefix .. '%s*/'
 def_frag  = '^%s*([^(]-)%s*/(t?)[%s*~=]*$'
 def_code  = '^%s*(.-)%s*(%b())%s*/[%s*~=]*$'
@@ -143,8 +164,8 @@ def_tbl_call  = '(%b{})%s*%)'
 @./read the remaining input/
 local st = search_state(line)
 while true do
-	line = io.read('l')
-	if line == nil then break end
+	line = read_next_line()
+	if not line then break end
 	st = st(line)
 end
 @.
