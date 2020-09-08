@@ -18,6 +18,7 @@ local eval_env       = {
 	-- add basics from the stdlib
 	result = {};    string=string; 
 	table=table;    math=math;
+	ipairs=ipairs;  pairs=pairs;
 }
 
 -- provide a way for users to dynamically add named macros 
